@@ -3,7 +3,6 @@ import { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   ActivityIndicator,
   TextInput,
   TouchableOpacity,
@@ -11,6 +10,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
+import {
+  AdminScreen,
+  AdminCard,
+  SectionHeading,
+} from '../../components/admin/AdminUI';
 
 type InventoryRow = {
   id: string;
@@ -355,52 +359,52 @@ export default function InventoryScreen() {
     );
   }
 
+  const addIngredientButton = (
+    <TouchableOpacity
+      onPress={openIngredientModal}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#111827',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <Text
+        style={{
+          color: '#fff',
+          fontSize: 24,
+          fontWeight: '600',
+          marginTop: -4,
+        }}
+      >
+        +
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <>
-      <ScrollView
-        style={{ flex: 1, padding: 20 }}
-        contentContainerStyle={{ paddingBottom: 40, gap: 12 }}
+      <AdminScreen
+        title="Inventory"
+        subtitle={`Laporan stok untuk tarikh ${ctx.dateISO}`}
+        actions={addIngredientButton}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 4,
-          }}
-        >
-          <View style={{ flexShrink: 1 }}>
-            <Text style={{ fontSize: 24, fontWeight: '700' }}>Inventory</Text>
-            <Text style={{ color: '#555', marginTop: 2 }}>
-              Laporan stok untuk tarikh:{' '}
-              <Text style={{ fontWeight: '600' }}>{ctx.dateISO}</Text>
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={openIngredientModal}
+        {error && (
+          <AdminCard
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: '#111827',
-              justifyContent: 'center',
-              alignItems: 'center',
+              backgroundColor: '#fef2f2',
+              borderColor: '#fee2e2',
             }}
           >
-            <Text
-              style={{
-                color: '#fff',
-                fontSize: 20,
-                fontWeight: '700',
-                marginTop: -1,
-              }}
-            >
-              +
+            <Text style={{ color: '#b91c1c', fontWeight: '600' }}>
+              {error}
             </Text>
-          </TouchableOpacity>
-        </View>
+          </AdminCard>
+        )}
 
-        {error && <Text style={{ color: 'red' }}>{error}</Text>}
+        <SectionHeading label="Keadaan stok" />
 
         {rows.map((row) => {
           let statusText = 'OK';
@@ -419,110 +423,110 @@ export default function InventoryScreen() {
         const latestBatch = latestBatchByIngredient[row.id];
 
         return (
-          <View
-            key={row.id}
-            style={{
-              paddingVertical: 10,
-              borderBottomWidth: 1,
-              borderColor: '#eee',
-            }}
-          >
-            {/* Name + status chip */}
+          <AdminCard key={row.id} style={{ gap: 12 }}>
             <View
               style={{
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: 4,
               }}
             >
-              <Text style={{ fontWeight: '600', fontSize: 16 }}>
-                {row.name}
-              </Text>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0f172a' }}>
+                  {row.name}
+                </Text>
+                <Text style={{ color: '#64748b', fontSize: 12 }}>
+                  {row.unit.toUpperCase()} • stok sasaran min {row.available > 0 ? 'dipenuhi' : 'diperlukan'}
+                </Text>
+              </View>
               <View
                 style={{
-                  paddingVertical: 2,
-                  paddingHorizontal: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
                   borderRadius: 999,
-                  backgroundColor: '#f3f4f6',
+                  backgroundColor: '#f1f5f9',
                 }}
               >
-                <Text style={{ color: statusColor, fontSize: 12 }}>
-                  {statusText}
-                </Text>
+                <Text style={{ color: statusColor, fontWeight: '600' }}>{statusText}</Text>
               </View>
             </View>
 
-            {/* Available / expired */}
-            <Text>
-              Stok tersedia:{' '}
-              <Text style={{ fontWeight: '600' }}>
-                {formatQty(row.available, row.unit)}
-              </Text>
-            </Text>
-            {row.expiredQty > 0 && (
-              <Text style={{ color: '#b91c1c' }}>
-                Stok luput:{' '}
-                <Text style={{ fontWeight: '600' }}>
-                  {formatQty(row.expiredQty, row.unit)}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View>
+                <Text style={{ color: '#475467' }}>Stok tersedia</Text>
+                <Text style={{ fontSize: 20, fontWeight: '700' }}>
+                  {formatQty(row.available, row.unit)}
                 </Text>
-              </Text>
-            )}
+              </View>
+              {row.expiredQty > 0 && (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ color: '#b91c1c' }}>Stok luput</Text>
+                  <Text style={{ fontWeight: '700', color: '#b91c1c' }}>
+                    {formatQty(row.expiredQty, row.unit)}
+                  </Text>
+                </View>
+              )}
+            </View>
 
-            {/* Expiry info */}
             {row.soonestExpiryDays !== null && row.soonestExpiryDate && (
-              <Text style={{ color: '#555' }}>
-                Batch terawal luput:{' '}
-                <Text style={{ fontWeight: '600' }}>
-                  {row.soonestExpiryDate} (
-                  {row.soonestExpiryDays === 0
-                    ? 'luput hari ini'
-                    : `dalam ${row.soonestExpiryDays} hari`}
-                  )
+              <View>
+                <Text style={{ color: '#6b7280', fontSize: 12 }}>
+                  Batch terawal luput {row.soonestExpiryDate} (
+                  {row.soonestExpiryDays === 0 ? 'hari ini' : `dalam ${row.soonestExpiryDays} hari`})
                 </Text>
-              </Text>
+              </View>
             )}
             {latestBatch && (
-              <Text style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
-                Batch terakhir diterima:{' '}
-                <Text style={{ fontWeight: '600' }}>
-                  {latestBatch.receivedAt
-                    ? dateOnly(latestBatch.receivedAt)
-                    : 'tiada rekod'}
-                </Text>
-                {latestBatch.expiryDate
-                  ? ` | Luput ${dateOnly(latestBatch.expiryDate)}`
-                  : ''}
-              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: '#94a3b8' }}>Diterima</Text>
+                  <Text style={{ fontWeight: '600', color: '#475467' }}>
+                    {latestBatch.receivedAt
+                      ? dateOnly(latestBatch.receivedAt)
+                      : 'Tiada rekod'}
+                  </Text>
+                </View>
+                {latestBatch.expiryDate && (
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>Luput</Text>
+                    <Text style={{ fontWeight: '600', color: '#475467' }}>
+                      {dateOnly(latestBatch.expiryDate)}
+                    </Text>
+                  </View>
+                )}
+              </View>
             )}
-            <View style={{ flexDirection: 'row', marginTop: 8 }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: '#1d4ed8',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                }}
-                onPress={() => openForm(row)}
-              >
-                <Text
-                  style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}
-                >
-                  Tambah stok
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+
+            <TouchableOpacity
+              style={{
+                marginTop: 4,
+                backgroundColor: '#111827',
+                paddingVertical: 10,
+                borderRadius: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => openForm(row)}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Tambah stok</Text>
+            </TouchableOpacity>
+          </AdminCard>
         );
       })}
 
         {rows.length === 0 && (
-          <Text style={{ color: '#666', marginTop: 16 }}>
-            Tiada bahan lagi. Tambah bahan melalui backend atau nanti kita buat
-            form tambah stok.
-          </Text>
+          <AdminCard>
+            <Text style={{ color: '#6b7280' }}>
+              Tiada bahan lagi. Tambah bahan melalui butang + untuk mula menjejak stok.
+            </Text>
+          </AdminCard>
         )}
-      </ScrollView>
+      </AdminScreen>
       <Modal
         visible={ingredientModalVisible}
         animationType="fade"

@@ -9,6 +9,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
+import {
+  AdminScreen,
+  AdminCard,
+  SectionHeading,
+} from '../../components/admin/AdminUI';
 
 type PaymentMethod = 'cash' | 'duitnowqr'; // follow SQL enum
 
@@ -47,6 +52,10 @@ export default function SalesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [ctx, setCtx] = useState<TodayContext | null>(null);
+
+  const screenSubtitle = ctx
+    ? `Catat jualan untuk ${ctx.dateISO}`
+    : 'Catat jualan harian anda';
 
   const loadData = useCallback(async () => {
     try {
@@ -229,254 +238,236 @@ export default function SalesScreen() {
 
   if (loading || !ctx) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator />
-        <Text style={{ marginTop: 8 }}>Loading menu & tarikh jualan…</Text>
-      </View>
+      <AdminScreen title="Jualan" subtitle="Memuatkan data POS">
+        <AdminCard style={{ alignItems: 'center' }}>
+          <ActivityIndicator />
+          <Text style={{ marginTop: 8 }}>Loading menu & tarikh jualan.</Text>
+        </AdminCard>
+      </AdminScreen>
     );
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      <ScrollView
-        style={{ flex: 1, padding: 20 }}
-        contentContainerStyle={{ paddingBottom: 120, gap: 12 }}
+  const summaryCard = (
+    <AdminCard style={{ paddingBottom: 12 }}>
+      <SectionHeading label="Ringkasan pesanan" />
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
       >
-        <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 8 }}>
-          Sales / POS
+        <Text>
+          Item:{' '}
+          <Text style={{ fontWeight: '600' }}>{totalQty}</Text>
         </Text>
-        <Text style={{ color: '#555', marginBottom: 4 }}>
-            Tarikh jualan:{' '}
-            <Text style={{ fontWeight: '600' }}>{ctx.dateISO}</Text>
+        <Text>
+          Jumlah:{' '}
+          <Text style={{ fontWeight: '700' }}>
+            RM {totalAmount.toFixed(2)}
+          </Text>
         </Text>
+      </View>
 
-
-        <Text style={{ color: '#555', marginBottom: 8 }}>
-          Rekod jualan harian dengan pilih menu & kuantiti. Setiap simpanan
-          akan ditulis ke log jualan.
-        </Text>
-
-        {error && <Text style={{ color: 'red' }}>{error}</Text>}
-        {info && <Text style={{ color: 'green' }}>{info}</Text>}
-
-        {/* Payment method toggle */}
-        <View
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity
+          onPress={clearCart}
           style={{
-            flexDirection: 'row',
-            gap: 8,
-            marginVertical: 8,
+            flex: 1,
+            paddingVertical: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#d4d4d4',
+            alignItems: 'center',
+          }}
+          disabled={saving}
+        >
+          <Text style={{ fontWeight: '500' }}>Kosongkan</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={saveSale}
+          disabled={saving || totalQty === 0}
+          style={{
+            flex: 2,
+            paddingVertical: 12,
+            borderRadius: 12,
+            backgroundColor: saving || totalQty === 0 ? '#9ca3af' : '#111827',
             alignItems: 'center',
           }}
         >
-          <Text style={{ fontWeight: '600' }}>Kaedah bayaran:</Text>
-          <TouchableOpacity
-            onPress={() => setPaymentMethod('cash')}
-            style={{
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor:
-                paymentMethod === 'cash' ? '#000' : '#d4d4d4',
-              backgroundColor:
-                paymentMethod === 'cash' ? '#000' : '#fff',
-            }}
-          >
-            <Text
-              style={{
-                color: paymentMethod === 'cash' ? '#fff' : '#000',
-              }}
-            >
-              Cash
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPaymentMethod('duitnowqr')}
-            style={{
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor:
-                paymentMethod === 'duitnowqr' ? '#000' : '#d4d4d4',
-              backgroundColor:
-                paymentMethod === 'duitnowqr' ? '#000' : '#fff',
-            }}
-          >
-            <Text
-              style={{
-                color:
-                  paymentMethod === 'duitnowqr' ? '#fff' : '#000',
-              }}
-            >
-              DuitNow QR
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Simpan jualan</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </AdminCard>
+  );
 
-        {/* Menu list */}
-        {variants.map((v) => {
-          const entry = cart[v.id];
-          const qty = entry?.qty ?? 0;
-          const lineTotal = qty * v.price;
+  return (
+    <View style={{ flex: 1 }}>
+      <AdminScreen
+        title="Jualan"
+        subtitle={screenSubtitle}
+        contentPaddingBottom={220}
+      >
+        {error && (
+          <AdminCard style={{ backgroundColor: '#fef2f2', borderColor: '#fee2e2' }}>
+            <Text style={{ color: '#b91c1c', fontWeight: '600' }}>{error}</Text>
+          </AdminCard>
+        )}
+        {info && (
+          <AdminCard style={{ backgroundColor: '#ecfdf3', borderColor: '#d1fae5' }}>
+            <Text style={{ color: '#065f46', fontWeight: '600' }}>{info}</Text>
+          </AdminCard>
+        )}
 
-          return (
-            <View
-              key={v.id}
-              style={{
-                paddingVertical: 10,
-                borderBottomWidth: 1,
-                borderColor: '#eee',
-              }}
-            >
-              <Text style={{ fontWeight: '600' }}>
-                {v.itemName} — {v.variantName}
-              </Text>
-              <Text style={{ color: '#666' }}>
-                Harga: RM {v.price.toFixed(2)}
-              </Text>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: 8,
-                  justifyContent: 'space-between',
-                }}
-              >
-                {/* Qty control */}
-                <View
+        <AdminCard>
+          <SectionHeading label="Kaedah bayaran" />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {(['cash', 'duitnowqr'] as PaymentMethod[]).map((pm) => {
+              const active = paymentMethod === pm;
+              return (
+                <TouchableOpacity
+                  key={pm}
+                  onPress={() => setPaymentMethod(pm)}
                   style={{
-                    flexDirection: 'row',
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: active ? 0 : 1,
+                    borderColor: '#d1d5db',
+                    backgroundColor: active ? '#0f172a' : '#fff',
                     alignItems: 'center',
-                    gap: 8,
                   }}
                 >
-                  <TouchableOpacity
-                    onPress={() => changeQty(v, -1)}
+                  <Text
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: '#d4d4d4',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      color: active ? '#fff' : '#0f172a',
+                      fontWeight: '600',
                     }}
                   >
-                    <Text style={{ fontSize: 18 }}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={{ minWidth: 24, textAlign: 'center' }}>
-                    {qty}
+                    {pm === 'cash' ? 'Tunai' : 'DuitNow QR'}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => changeQty(v, 1)}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </AdminCard>
+
+        <AdminCard>
+          <SectionHeading label="Pilih item" />
+          <View style={{ gap: 12 }}>
+            {variants.map((v) => {
+              const entry = cart[v.id];
+              const qty = entry?.qty ?? 0;
+              const lineTotal = qty * v.price;
+
+              return (
+                <View
+                  key={v.id}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#e5e7eb',
+                    borderRadius: 12,
+                    padding: 12,
+                    backgroundColor: '#fff',
+                    shadowColor: '#000',
+                    shadowOpacity: 0.05,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }}
+                >
+                  <View
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      borderWidth: 1,
-                      borderColor: '#000',
-                      backgroundColor: '#000',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
                       alignItems: 'center',
-                      justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ fontSize: 18, color: '#fff' }}>+</Text>
-                  </TouchableOpacity>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                      <Text style={{ fontWeight: '600' }}>
+                        {v.itemName} - {v.variantName}
+                      </Text>
+                      <Text style={{ color: '#6b7280', fontSize: 12 }}>
+                        RM {v.price.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: '#6b7280', fontSize: 12 }}>Qty: {qty}</Text>
+                      <Text style={{ fontWeight: '600' }}>
+                        RM {lineTotal.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginTop: 12,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => changeQty(v, -1)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        borderWidth: 1,
+                        borderColor: '#d4d4d4',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 18 }}>-</Text>
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        minWidth: 28,
+                        textAlign: 'center',
+                        fontWeight: '600',
+                      }}
+                    >
+                      {qty}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => changeQty(v, 1)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: '#111827',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 18, color: '#fff' }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
+              );
+            })}
+          </View>
+        </AdminCard>
+      </AdminScreen>
 
-                {/* Line total */}
-                <Text style={{ fontWeight: '600' }}>
-                  RM {lineTotal.toFixed(2)}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {/* Bottom summary bar */}
       <View
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          padding: 16,
-          borderTopWidth: 1,
-          borderColor: '#e5e7eb',
-          backgroundColor: '#fff',
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          paddingTop: 8,
+          backgroundColor: 'transparent',
         }}
       >
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginBottom: 8,
-          }}
-        >
-          <Text>
-            Item:{' '}
-            <Text style={{ fontWeight: '600' }}>{totalQty}</Text>
-          </Text>
-          <Text>
-            Jumlah:{' '}
-            <Text style={{ fontWeight: '700' }}>
-              RM {totalAmount.toFixed(2)}
-            </Text>
-          </Text>
-        </View>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          <TouchableOpacity
-            onPress={clearCart}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: '#d4d4d4',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            disabled={saving}
-          >
-            <Text>Clear</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={saveSale}
-            disabled={saving || totalQty === 0}
-            style={{
-              flex: 2,
-              paddingVertical: 10,
-              borderRadius: 10,
-              backgroundColor:
-                saving || totalQty === 0 ? '#9ca3af' : '#000',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text
-                style={{
-                  color: '#fff',
-                  fontWeight: '700',
-                }}
-              >
-                Simpan jualan
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        {summaryCard}
       </View>
     </View>
   );

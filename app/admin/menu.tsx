@@ -1,4 +1,4 @@
-// app/(admin)/menu.tsx
+﻿// app/(admin)/menu.tsx
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -10,6 +10,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
+import {
+  AdminScreen,
+  AdminCard,
+  SectionHeading,
+} from '../../components/admin/AdminUI';
 
 type Ingredient = {
   id: string;
@@ -418,213 +423,161 @@ export default function MenuScreen() {
     }
   };
 
+  const screenSubtitle =
+    '1) Pilih menu · 2) Pilih / tambah varian · 3) Ubah resipi.';
+  const headerAction = (
+    <TouchableOpacity
+      onPress={() => setShowAddMenuForm((x) => !x)}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#111827',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <Text
+        style={{
+          color: '#fff',
+          fontSize: 22,
+          fontWeight: '600',
+          marginTop: -2,
+        }}
+      >
+        +
+      </Text>
+    </TouchableOpacity>
+  );
+
   if (loading && items.length === 0) {
     return (
-      <View
-        style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+      <AdminScreen
+        title="Menu & Resipi"
+        subtitle={screenSubtitle}
+        actions={headerAction}
       >
-        <ActivityIndicator />
-        <Text style={{ marginTop: 8 }}>Loading menu…</Text>
-      </View>
+        <AdminCard style={{ alignItems: 'center' }}>
+          <ActivityIndicator />
+          <Text style={{ marginTop: 8 }}>Loading menu…</Text>
+        </AdminCard>
+      </AdminScreen>
     );
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, padding: 20 }}
-      contentContainerStyle={{ paddingBottom: 40 }}
+    <AdminScreen
+      title="Menu & Resipi"
+      subtitle={screenSubtitle}
+      actions={headerAction}
+      contentPaddingBottom={160}
     >
-      {/* Header + Add menu icon */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 8,
-        }}
-      >
-        <View style={{ flexShrink: 1 }}>
-          <Text style={{ fontSize: 24, fontWeight: '700' }}>
-            Menu & Resipi
-          </Text>
-          <Text style={{ color: '#4b5563', marginTop: 2, fontSize: 12 }}>
-            1) Pilih menu → 2) Pilih / tambah varian → 3) Ubah resipi.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => setShowAddMenuForm((x) => !x)}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            backgroundColor: '#111827',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <Text
-            style={{
-              color: '#fff',
-              fontSize: 20,
-              fontWeight: '700',
-              marginTop: -1,
-            }}
-          >
-            ＋
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Quick summary */}
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          marginBottom: 10,
-        }}
-      >
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 999,
-            backgroundColor: '#111827',
-            marginRight: 6,
-            marginBottom: 6,
-          }}
-        >
-          <Text
-            style={{
-              color: '#f9fafb',
-              fontSize: 12,
-              fontWeight: '600',
-            }}
-          >
-            {totalMenus} menu
-          </Text>
-        </View>
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 999,
-            backgroundColor: '#111827',
-            marginRight: 6,
-            marginBottom: 6,
-          }}
-        >
-          <Text
-            style={{
-              color: '#f9fafb',
-              fontSize: 12,
-              fontWeight: '600',
-            }}
-          >
-            {totalVariants} varian
-          </Text>
-        </View>
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 999,
-            backgroundColor: '#111827',
-            marginRight: 6,
-            marginBottom: 6,
-          }}
-        >
-          <Text
-            style={{
-              color: '#f9fafb',
-              fontSize: 12,
-              fontWeight: '600',
-            }}
-          >
-            {uniqueRecipeIngredients} bahan
-          </Text>
-        </View>
-      </View>
-
       {error && (
-        <Text style={{ color: 'red', marginBottom: 8 }}>{error}</Text>
+        <AdminCard
+          style={{
+            backgroundColor: '#fef2f2',
+            borderColor: '#fee2e2',
+          }}
+        >
+          <Text style={{ color: '#b91c1c', fontWeight: '600' }}>{error}</Text>
+        </AdminCard>
       )}
 
-      {/* Add menu form (expandable) */}
-      {showAddMenuForm && (
+      <AdminCard>
+        <SectionHeading label="Ringkasan" />
         <View
           style={{
-            marginBottom: 16,
-            padding: 12,
-            borderRadius: 12,
-            backgroundColor: '#f3f4f6',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 12,
           }}
         >
-          <Text
-            style={{ fontWeight: '700', marginBottom: 4, fontSize: 15 }}
-          >
-            Tambah menu baharu
-          </Text>
+          {[{
+            label: 'Menu aktif',
+            value: totalMenus,
+          },
+          {
+            label: 'Jumlah varian',
+            value: totalVariants,
+          },
+          {
+            label: 'Bahan unik digunakan',
+            value: uniqueRecipeIngredients,
+          }].map((stat) => (
+            <View
+              key={stat.label}
+              style={{
+                flexGrow: 1,
+                minWidth: 120,
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: '#f5f7fb',
+              }}
+            >
+              <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                {stat.label}
+              </Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#0f172a' }}>
+                {stat.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </AdminCard>
+
+      {showAddMenuForm && (
+        <AdminCard>
+          <SectionHeading label="Tambah menu baru" />
           <TextInput
-            placeholder="Nama menu (cth: Nasi Lemak Ayam Goreng)"
+            placeholder="Nama menu"
             value={newItemName}
             onChangeText={setNewItemName}
             style={{
               borderWidth: 1,
-              borderColor: '#d4d4d4',
-              borderRadius: 8,
-              paddingHorizontal: 8,
-              paddingVertical: 6,
-              marginBottom: 6,
+              borderColor: '#d1d5db',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              marginBottom: 8,
               backgroundColor: '#fff',
             }}
           />
           <TextInput
-            placeholder="Kategori (cth: Makanan / Minuman)"
+            placeholder="Kategori (optional)"
             value={newItemCategory}
             onChangeText={setNewItemCategory}
             style={{
               borderWidth: 1,
-              borderColor: '#d4d4d4',
-              borderRadius: 8,
-              paddingHorizontal: 8,
-              paddingVertical: 6,
-              marginBottom: 8,
+              borderColor: '#d1d5db',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              marginBottom: 12,
               backgroundColor: '#fff',
             }}
           />
           <TouchableOpacity
             onPress={handleAddItem}
             style={{
-              alignSelf: 'flex-start',
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 999,
+              paddingVertical: 12,
+              borderRadius: 12,
               backgroundColor: '#111827',
+              alignItems: 'center',
             }}
           >
-            <Text
-              style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}
-            >
-              Simpan menu
-            </Text>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Simpan menu</Text>
           </TouchableOpacity>
-        </View>
+        </AdminCard>
       )}
 
-      {/* Step 1: choose menu */}
-      <Text
-        style={{ fontWeight: '700', marginBottom: 4, fontSize: 15 }}
-      >
-        Langkah 1 — Pilih menu 📋
-      </Text>
-      {items.length === 0 ? (
-        <Text style={{ color: '#6b7280', marginBottom: 16 }}>
-          Tiada menu lagi. Tekan ikon ＋ di atas untuk menambah.
-        </Text>
-      ) : (
-        <View style={{ marginBottom: 16 }}>
-          {items.map((item) => {
+      <AdminCard>
+        <SectionHeading label="Langkah 1 · Pilih menu" />
+        {items.length === 0 ? (
+          <Text style={{ color: '#6b7280' }}>
+            Tiada menu lagi. Tekan ikon + di atas untuk menambah.
+          </Text>
+        ) : (
+          items.map((item) => {
             const active = item.id === selectedItemId;
             const vCount = variantsByItem(item.id).length;
             const ingCount = ingredientCountForItem(item.id);
@@ -639,96 +592,64 @@ export default function MenuScreen() {
                     setRecipeVariantId(null);
                     setRecipeIngredientId('');
                     setRecipeQty('');
-                  } else {
-                    setSelectedVariantId(null);
                   }
                 }}
                 style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 10,
-                  borderRadius: 10,
-                  marginBottom: 6,
-                  backgroundColor: active ? '#111827' : '#f9fafb',
-                  borderWidth: active ? 0 : 1,
-                  borderColor: '#e5e7eb',
+                  paddingVertical: 12,
+                  borderBottomWidth: 1,
+                  borderColor: '#f1f5f9',
                 }}
               >
-                <Text
-                  style={{
-                    fontWeight: '600',
-                    color: active ? '#fff' : '#111827',
-                  }}
-                >
-                  {item.name}
-                </Text>
                 <View
                   style={{
                     flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    marginTop: 2,
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: active ? '#e5e7eb' : '#6b7280',
-                      marginRight: 6,
-                    }}
-                  >
-                    {item.category || 'Tiada kategori'}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: active ? '#e5e7eb' : '#6b7280',
-                      marginRight: 6,
-                    }}
-                  >
-                    • {vCount} varian
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: active ? '#e5e7eb' : '#6b7280',
-                    }}
-                  >
-                    • {ingCount} bahan resipi
-                  </Text>
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: active ? '700' : '500',
+                        color: active ? '#0f172a' : '#475467',
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>
+                      {item.category || 'Tanpa kategori'} ·{' '}
+                      {item.active ? 'Aktif' : 'Tidak aktif'}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>
+                      {vCount} varian
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>
+                      {ingCount} bahan
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             );
-          })}
-        </View>
-      )}
+          })
+        )}
+      </AdminCard>
 
-      {/* Step 2 & 3: variants + recipe for selected menu */}
       {selectedItem && (
-        <View
-          style={{
-            marginBottom: 24,
-            padding: 12,
-            borderRadius: 12,
-            backgroundColor: '#f9fafb',
-          }}
-        >
-          <Text style={{ fontWeight: '700', marginBottom: 2 }}>
-            {selectedItem.name}
-          </Text>
-          <Text style={{ color: '#6b7280', marginBottom: 8, fontSize: 12 }}>
+        <AdminCard>
+          <SectionHeading label="Langkah 2 & 3 · Varian & Resipi" />
+          <Text style={{ fontWeight: '700', marginBottom: 2 }}>{selectedItem.name}</Text>
+          <Text style={{ color: '#94a3b8', marginBottom: 10 }}>
             Kategori: {selectedItem.category || 'Tiada'} ·{' '}
             {selectedItem.active ? 'Aktif' : 'Tidak aktif'}
           </Text>
 
-          {/* Variants row */}
-          <Text
-            style={{ fontWeight: '600', fontSize: 13, marginBottom: 4 }}
-          >
-            Langkah 2 — Pilih atau tambah varian 🍱
-          </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 8 }}
+            style={{ marginBottom: 10 }}
           >
             {variantsByItem(selectedItem.id).map((v) => {
               const active = v.id === selectedVariantId;
@@ -742,7 +663,7 @@ export default function MenuScreen() {
                     setRecipeQty('');
                   }}
                   style={{
-                    paddingHorizontal: 12,
+                    paddingHorizontal: 14,
                     paddingVertical: 6,
                     borderRadius: 999,
                     backgroundColor: active ? '#111827' : '#e5e7eb',
@@ -765,39 +686,28 @@ export default function MenuScreen() {
             <TouchableOpacity
               onPress={() => setShowVariantForm((x) => !x)}
               style={{
-                paddingHorizontal: 12,
+                paddingHorizontal: 14,
                 paddingVertical: 6,
                 borderRadius: 999,
                 backgroundColor: '#f97316',
               }}
             >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: '#fff',
-                  fontWeight: '600',
-                }}
-              >
-                ＋ Varian
+              <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>
+                + Varian
               </Text>
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Add variant form */}
           {showVariantForm && (
             <View
               style={{
                 marginBottom: 12,
-                padding: 8,
-                borderRadius: 10,
+                padding: 10,
+                borderRadius: 12,
                 backgroundColor: '#f3f4f6',
               }}
             >
-              <Text
-                style={{ fontWeight: '600', marginBottom: 4, fontSize: 13 }}
-              >
-                Tambah varian baharu
-              </Text>
+              <Text style={{ fontWeight: '600', marginBottom: 6 }}>Tambah varian baharu</Text>
               <TextInput
                 placeholder="Nama varian (cth: Regular)"
                 value={newVariantName}
@@ -805,53 +715,46 @@ export default function MenuScreen() {
                 style={{
                   borderWidth: 1,
                   borderColor: '#d4d4d4',
-                  borderRadius: 8,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  marginBottom: 6,
+                  borderRadius: 10,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  marginBottom: 8,
                   backgroundColor: '#fff',
                 }}
               />
-              <View
-                style={{
-                  flexDirection: 'row',
-                  marginBottom: 6,
-                }}
-              >
-                <View style={{ flex: 1, marginRight: 6 }}>
-                  <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                    Harga
-                  </Text>
+              <View style={{ flexDirection: 'row', marginBottom: 8, gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: '#6b7280' }}>Harga (RM)</Text>
                   <TextInput
-                    placeholder="cth: 8.00"
+                    placeholder="cth: 12.90"
                     value={newVariantPrice}
                     onChangeText={setNewVariantPrice}
                     keyboardType="numeric"
                     style={{
                       borderWidth: 1,
                       borderColor: '#d4d4d4',
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 6,
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
                       backgroundColor: '#fff',
                     }}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                    Baseline sehari
+                    Baseline harian
                   </Text>
                   <TextInput
-                    placeholder="cth: 40"
+                    placeholder="cth: 30"
                     value={newVariantBaseline}
                     onChangeText={setNewVariantBaseline}
                     keyboardType="numeric"
                     style={{
                       borderWidth: 1,
                       borderColor: '#d4d4d4',
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 6,
+                      borderRadius: 10,
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
                       backgroundColor: '#fff',
                     }}
                   />
@@ -860,120 +763,92 @@ export default function MenuScreen() {
               <TouchableOpacity
                 onPress={handleAddVariant}
                 style={{
-                  alignSelf: 'flex-start',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 999,
+                  paddingVertical: 10,
+                  borderRadius: 10,
                   backgroundColor: '#111827',
+                  alignItems: 'center',
                 }}
               >
-                <Text
-                  style={{
-                    color: '#fff',
-                    fontWeight: '600',
-                    fontSize: 13,
-                  }}
-                >
-                  Simpan varian
-                </Text>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>Simpan varian</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Step 3: Recipes for selected variant */}
-          <Text
-            style={{ fontWeight: '600', fontSize: 13, marginBottom: 4 }}
-          >
-            Langkah 3 — Ubah resipi varian 🧪
-          </Text>
-
-          {!selectedVariant ? (
-            <Text style={{ color: '#6b7280', fontSize: 12 }}>
-              Pilih varian dahulu atau tambah varian baru.
-            </Text>
-          ) : (
+          {selectedVariant && (
             <>
-              {/* Existing recipe list */}
-              <View style={{ marginBottom: 8 }}>
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: '#4b5563',
-                    marginBottom: 4,
-                  }}
-                >
-                  Resipi: {selectedItem.name} — {selectedVariant.name}
+              <View
+                style={{
+                  backgroundColor: '#fff',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ fontWeight: '600', marginBottom: 8 }}>
+                  Bahan untuk {selectedVariant.name}
                 </Text>
                 {recipesByVariant(selectedVariant.id).length === 0 ? (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: '#9ca3af',
-                      marginBottom: 4,
-                    }}
-                  >
-                    Tiada bahan lagi. Tambah bahan di bawah.
+                  <Text style={{ color: '#94a3b8' }}>
+                    Belum ada bahan untuk varian ini.
                   </Text>
                 ) : (
                   recipesByVariant(selectedVariant.id).map((r) => (
                     <View
-                      key={r.ingredient_id}
+                      key={`${r.variant_id}_${r.ingredient_id}`}
                       style={{
                         flexDirection: 'row',
-                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        paddingVertical: 4,
+                        alignItems: 'center',
+                        paddingVertical: 8,
+                        borderBottomWidth: 1,
+                        borderColor: '#f1f5f9',
                       }}
                     >
-                      <Text
-                        style={{ fontSize: 12, color: '#374151', flex: 1 }}
-                      >
-                        {r.ingredient_name || 'Bahan'} —{' '}
-                        {r.qty_per_serving} {r.ingredient_unit || ''} /
-                        hidangan
-                      </Text>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                        }}
-                      >
+                      <View>
+                        <Text style={{ fontWeight: '500' }}>
+                          {r.ingredient_name} ({r.ingredient_unit})
+                        </Text>
+                        <Text style={{ color: '#94a3b8' }}>
+                          {r.qty_per_serving} per hidangan
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
                         <TouchableOpacity
                           onPress={() =>
                             handleEditRecipeRow(
-                              selectedVariant.id,
+                              r.variant_id,
                               r.ingredient_id,
                               r.qty_per_serving
                             )
                           }
-                          style={{ marginRight: 8 }}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#e5e7eb',
+                          }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: '#1d4ed8',
-                              fontWeight: '500',
-                            }}
-                          >
-                            Edit
-                          </Text>
+                          <Text style={{ fontSize: 12 }}>Edit</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() =>
                             handleDeleteRecipeRow(
-                              selectedVariant.id,
+                              r.variant_id,
                               r.ingredient_id
                             )
                           }
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 10,
+                            backgroundColor: '#fee2e2',
+                          }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: '#b91c1c',
-                              fontWeight: '500',
-                            }}
-                          >
-                            Padam
+                          <Text style={{ fontSize: 12, color: '#b91c1c' }}>
+                            Buang
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -982,65 +857,30 @@ export default function MenuScreen() {
                 )}
               </View>
 
-              {/* Recipe editor */}
               <View
                 style={{
-                  padding: 8,
-                  borderRadius: 8,
-                  backgroundColor: '#f3f4f6',
+                  borderRadius: 12,
+                  padding: 12,
+                  backgroundColor: '#f8fafc',
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    marginBottom: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '600',
-                    }}
-                  >
-                    Tambah / kemas kini bahan
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setRecipeVariantId(selectedVariant.id);
-                      setRecipeIngredientId('');
-                      setRecipeQty('');
-                      setShowIngredientPicker(false);
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: '#1d4ed8',
-                      }}
-                    >
-                      + Bahan baharu
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={{ fontWeight: '600', marginBottom: 6 }}>
+                  Tambah / edit bahan resipi
+                </Text>
 
-                {/* Ingredient picker */}
                 <TouchableOpacity
-                  onPress={() => {
-                    setRecipeVariantId(selectedVariant.id);
-                    setShowIngredientPicker((x) => !x);
-                  }}
+                  onPress={() => setShowIngredientPicker((x) => !x)}
                   style={{
                     borderWidth: 1,
-                    borderColor: '#d4d4d4',
-                    borderRadius: 8,
-                    paddingHorizontal: 8,
-                    paddingVertical: 6,
-                    marginBottom: 4,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    marginBottom: 6,
                     backgroundColor: '#fff',
                   }}
                 >
-                  <Text style={{ fontSize: 12, color: '#111827' }}>
+                  <Text style={{ fontSize: 12, color: '#6b7280' }}>
                     {recipeIngredientId
                       ? (() => {
                           const ing = ingredients.find(
@@ -1059,9 +899,9 @@ export default function MenuScreen() {
                     style={{
                       maxHeight: 150,
                       borderWidth: 1,
-                      borderColor: '#e5e7eb',
-                      borderRadius: 8,
-                      marginBottom: 4,
+                      borderColor: '#e2e8f0',
+                      borderRadius: 10,
+                      marginBottom: 6,
                       backgroundColor: '#fff',
                     }}
                   >
@@ -1074,10 +914,10 @@ export default function MenuScreen() {
                             setShowIngredientPicker(false);
                           }}
                           style={{
-                            paddingHorizontal: 8,
+                            paddingHorizontal: 10,
                             paddingVertical: 6,
                             borderBottomWidth: 1,
-                            borderColor: '#f3f4f6',
+                            borderColor: '#f1f5f9',
                           }}
                         >
                           <Text style={{ fontSize: 12 }}>
@@ -1089,8 +929,7 @@ export default function MenuScreen() {
                   </View>
                 )}
 
-                {/* Qty per serving */}
-                <View style={{ marginBottom: 6 }}>
+                <View style={{ marginBottom: 8 }}>
                   <Text style={{ fontSize: 11, color: '#6b7280' }}>
                     Kuantiti per hidangan
                   </Text>
@@ -1101,38 +940,27 @@ export default function MenuScreen() {
                     keyboardType="numeric"
                     style={{
                       borderWidth: 1,
-                      borderColor: '#d4d4d4',
-                      borderRadius: 8,
-                      paddingHorizontal: 8,
-                      paddingVertical: 6,
+                      borderColor: '#e2e8f0',
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
                       backgroundColor: '#fff',
                     }}
                   />
                 </View>
 
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
+                <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={handleSaveRecipe}
                     style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 8,
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 12,
                       backgroundColor: '#111827',
-                      marginRight: 8,
+                      alignItems: 'center',
                     }}
                   >
-                    <Text
-                      style={{
-                        color: '#fff',
-                        fontSize: 12,
-                        fontWeight: '600',
-                      }}
-                    >
+                    <Text style={{ color: '#fff', fontWeight: '600' }}>
                       Simpan resipi
                     </Text>
                   </TouchableOpacity>
@@ -1144,19 +972,16 @@ export default function MenuScreen() {
                       setShowIngredientPicker(false);
                     }}
                     style={{
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 8,
-                      backgroundColor: '#e5e7eb',
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#e2e8f0',
+                      backgroundColor: '#fff',
+                      minWidth: 100,
+                      alignItems: 'center',
                     }}
                   >
-                    <Text
-                      style={{
-                        color: '#111827',
-                        fontSize: 12,
-                        fontWeight: '500',
-                      }}
-                    >
+                    <Text style={{ color: '#0f172a', fontWeight: '500' }}>
                       Batal
                     </Text>
                   </TouchableOpacity>
@@ -1164,14 +989,15 @@ export default function MenuScreen() {
               </View>
             </>
           )}
-        </View>
+        </AdminCard>
       )}
 
       {loading && (
-        <View style={{ marginTop: 8 }}>
+        <AdminCard style={{ alignItems: 'center' }}>
           <ActivityIndicator />
-        </View>
+        </AdminCard>
       )}
-    </ScrollView>
+    </AdminScreen>
   );
 }
+

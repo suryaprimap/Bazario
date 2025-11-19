@@ -46,13 +46,54 @@ export default function AdminLayout() {
         },
         headerShadowVisible: false,
         headerTitleAlign: 'center',
+        sceneStyle: { backgroundColor: '#f4f6fb' },
       }}
     >
-      <Tabs.Screen name="sales" options={{ title: 'Sales' }} />
-      <Tabs.Screen name="inventory" options={{ title: 'Inventory' }} />
-      <Tabs.Screen name="menu" options={{ title: 'Menu' }} />
-      <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
-      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
+      <Tabs.Screen
+        name="sales"
+        options={{
+          title: 'Sales',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="point-of-sale" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="inventory"
+        options={{
+          title: 'Inventory',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="inventory" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="menu"
+        options={{
+          title: 'Menu',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="restaurant-menu" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: 'Analytics',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="stacked-line-chart" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="space-dashboard" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
