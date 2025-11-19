@@ -1,5 +1,5 @@
 ﻿// app/(admin)/menu.tsx
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   TextInput,
+  Modal,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import {
@@ -52,13 +54,15 @@ export default function MenuScreen() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [variants, setVariants] = useState<MenuVariant[]>([]);
   const [recipes, setRecipes] = useState<RecipeRow[]>([]);
+  const [variantCounts, setVariantCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   // Selection state
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
-  // Add menu form (show/hide + fields)
+  // Add menu modal visibility + fields
   const [showAddMenuForm, setShowAddMenuForm] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
@@ -74,6 +78,157 @@ export default function MenuScreen() {
   const [recipeIngredientId, setRecipeIngredientId] = useState<string>('');
   const [recipeQty, setRecipeQty] = useState('');
   const [showIngredientPicker, setShowIngredientPicker] = useState(false);
+  const [ingredientSearch, setIngredientSearch] = useState('');
+  const [menuSearch, setMenuSearch] = useState('');
+  const [canScrollVariantsLeft, setCanScrollVariantsLeft] = useState(false);
+  const [canScrollVariantsRight, setCanScrollVariantsRight] = useState(false);
+  const [variantLoading, setVariantLoading] = useState(false);
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const variantScrollRef = useRef<ScrollView | null>(null);
+const variantScrollOffset = useRef(0);
+const variantScrollMetrics = useRef({ container: 0, content: 0 });
+const selectedItemIdRef = useRef<string | null>(null);
+
+useEffect(() => {
+  selectedItemIdRef.current = selectedItemId;
+}, [selectedItemId]);
+
+  useEffect(() => {
+    variantScrollOffset.current = 0;
+    setCanScrollVariantsLeft(false);
+    setCanScrollVariantsRight(false);
+  }, [selectedItemId]);
+
+  useEffect(() => {
+    if (!variants.length) {
+      setCanScrollVariantsLeft(false);
+      setCanScrollVariantsRight(false);
+    } else {
+      updateVariantScrollIndicators();
+    }
+  }, [variants]);
+
+useEffect(() => {
+  setRecipeVariantId(null);
+  setRecipeIngredientId('');
+  setRecipeQty('');
+}, [selectedItemId]);
+
+useEffect(() => {
+  if (selectedVariantId) {
+    setRecipeVariantId(selectedVariantId);
+    setRecipeIngredientId('');
+    setRecipeQty('');
+  } else {
+    setRecipeVariantId(null);
+  }
+}, [selectedVariantId]);
+
+  const fetchVariantsForItem = useCallback(
+    async (itemId: string | null, preserveSelection = false) => {
+      if (!itemId) {
+        setVariants([]);
+        setRecipes([]);
+        setSelectedVariantId(null);
+        return;
+      }
+      try {
+        setVariantLoading(true);
+        const { data: variantRows, error: variantError } = await supabase
+          .from('menu_variants')
+          .select('id, menu_item_id, name, price, baseline_daily, sku')
+          .eq('menu_item_id', itemId)
+          .order('name', { ascending: true });
+        if (variantError) throw variantError;
+
+        const mapped: MenuVariant[] = (variantRows ?? []).map((r: any) => ({
+          id: r.id as string,
+          menu_item_id: r.menu_item_id as string,
+          name: r.name as string,
+          price: Number(r.price ?? 0),
+          baseline_daily: Number(r.baseline_daily ?? 0),
+          sku: r.sku ?? null,
+        }));
+        setVariants(mapped);
+
+        let nextVariantId: string | null =
+          preserveSelection && mapped.some((v) => v.id === selectedVariantId)
+            ? (selectedVariantId as string)
+            : mapped[0]?.id ?? null;
+        setSelectedVariantId(nextVariantId);
+
+        if (mapped.length === 0) {
+          setRecipes([]);
+          return;
+        }
+
+        const variantIds = mapped.map((v) => v.id);
+        if (!variantIds.length) {
+          setRecipes([]);
+          return;
+        }
+
+        const { data: recipeRows, error: recipeError } = await supabase
+          .from('recipe_items')
+          .select('variant_id, ingredient_id, qty_per_serving')
+          .in('variant_id', variantIds);
+
+        if (recipeError) throw recipeError;
+
+        const ingMap = new Map<string, Ingredient>();
+        ingredients.forEach((ing) => ingMap.set(ing.id, ing));
+
+        const mappedRecipes: RecipeRow[] = (recipeRows ?? []).map((r: any) => {
+          const ing = ingMap.get(r.ingredient_id as string);
+          return {
+            variant_id: r.variant_id as string,
+            ingredient_id: r.ingredient_id as string,
+            qty_per_serving: Number(r.qty_per_serving ?? 0),
+            ingredient_name: ing?.name,
+            ingredient_unit: ing?.unit,
+          };
+        });
+        setRecipes(mappedRecipes);
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message ?? 'Ralat memuatkan varian.');
+        setVariants([]);
+        setRecipes([]);
+      } finally {
+        setVariantLoading(false);
+      }
+    },
+    [ingredients, selectedVariantId]
+  );
+
+  const refreshVariantCounts = useCallback(
+    async (itemIds: string[]) => {
+      if (!itemIds.length) {
+        setVariantCounts({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('menu_variants')
+        .select('menu_item_id')
+        .in('menu_item_id', itemIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      itemIds.forEach((id) => {
+        counts[id] = 0;
+      });
+
+      (data ?? []).forEach((row: any) => {
+        const id = row.menu_item_id as string;
+        counts[id] = (counts[id] ?? 0) + 1;
+      });
+
+      setVariantCounts(counts);
+    },
+    []
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -123,86 +278,19 @@ export default function MenuScreen() {
       }));
       setItems(itemsMapped);
 
-      // 4) Variants
-      let variantsMapped: MenuVariant[] = [];
-      let recipesMapped: RecipeRow[] = [];
+      setVariants([]);
+      setRecipes([]);
+      await refreshVariantCounts(itemsMapped.map((m) => m.id));
 
+      const currentSelected = selectedItemIdRef.current;
       if (itemsMapped.length > 0) {
-        const itemIds = itemsMapped.map((m) => m.id);
-
-        const { data: variantRows, error: variantError } = await supabase
-          .from('menu_variants')
-          .select('id, menu_item_id, name, price, baseline_daily, sku')
-          .in('menu_item_id', itemIds);
-
-        if (variantError) throw variantError;
-
-        variantsMapped = (variantRows ?? []).map((r: any) => ({
-          id: r.id as string,
-          menu_item_id: r.menu_item_id as string,
-          name: r.name as string,
-          price: Number(r.price ?? 0),
-          baseline_daily: Number(r.baseline_daily ?? 0),
-          sku: r.sku ?? null,
-        }));
-        setVariants(variantsMapped);
-
-        if (variantsMapped.length > 0) {
-          const variantIds = variantsMapped.map((v) => v.id);
-          const { data: recipeRows, error: recipeError } = await supabase
-            .from('recipe_items')
-            .select('variant_id, ingredient_id, qty_per_serving')
-            .in('variant_id', variantIds);
-
-          if (recipeError) throw recipeError;
-
-          const ingMap = new Map<string, Ingredient>();
-          ingredientsMapped.forEach((ing) => ingMap.set(ing.id, ing));
-
-          recipesMapped = (recipeRows ?? []).map((r: any) => {
-            const ing = ingMap.get(r.ingredient_id as string);
-            return {
-              variant_id: r.variant_id as string,
-              ingredient_id: r.ingredient_id as string,
-              qty_per_serving: Number(r.qty_per_serving ?? 0),
-              ingredient_name: ing?.name,
-              ingredient_unit: ing?.unit,
-            };
-          });
-          setRecipes(recipesMapped);
-        } else {
-          setRecipes([]);
+        const exists = itemsMapped.some((item) => item.id === selectedItemId);
+        if (!currentSelected || !exists) {
+          setSelectedItemId(itemsMapped[0].id);
         }
       } else {
-        setVariants([]);
-        setRecipes([]);
-      }
-
-      // 5) Auto-select menu & variant if none chosen
-      if (!selectedItemId && itemsMapped.length > 0) {
-        const firstItemId = itemsMapped[0].id;
-        setSelectedItemId(firstItemId);
-
-        const firstItemVariants = variantsMapped.filter(
-          (v) => v.menu_item_id === firstItemId
-        );
-        if (!selectedVariantId && firstItemVariants.length > 0) {
-          setSelectedVariantId(firstItemVariants[0].id);
-        }
-      } else if (selectedItemId) {
-        const selectedItemVariants = variantsMapped.filter(
-          (v) => v.menu_item_id === selectedItemId
-        );
-        if (selectedItemVariants.length > 0) {
-          const stillValid = selectedItemVariants.some(
-            (v) => v.id === selectedVariantId
-          );
-          if (!stillValid) {
-            setSelectedVariantId(selectedItemVariants[0].id);
-          }
-        } else {
-          setSelectedVariantId(null);
-        }
+        setSelectedItemId(null);
+        setSelectedVariantId(null);
       }
     } catch (e: any) {
       console.error(e);
@@ -213,7 +301,7 @@ export default function MenuScreen() {
     } finally {
       setLoading(false);
     }
-  }, [selectedItemId, selectedVariantId]);
+  }, [refreshVariantCounts]);
 
   useFocusEffect(
     useCallback(() => {
@@ -229,21 +317,35 @@ export default function MenuScreen() {
     }, [loadData])
   );
 
-  // Helpers
-  const variantsByItem = (itemId: string) =>
-    variants.filter((v) => v.menu_item_id === itemId);
+  useEffect(() => {
+    fetchVariantsForItem(selectedItemId, false);
+  }, [selectedItemId, fetchVariantsForItem]);
 
-  const recipesByVariant = (variantId: string) =>
-    recipes.filter((r) => r.variant_id === variantId);
+  const recipesByVariant = useCallback(
+    (variantId: string) => recipes.filter((r) => r.variant_id === variantId),
+    [recipes]
+  );
 
-  const ingredientCountForItem = (itemId: string) => {
-    const vIds = variantsByItem(itemId).map((v) => v.id);
-    const used = new Set(
-      recipes
-        .filter((r) => vIds.includes(r.variant_id))
-        .map((r) => r.ingredient_id)
+  const menuOptions = items.filter((item) =>
+    item.name.toLowerCase().includes(menuSearch.toLowerCase())
+  );
+
+  const updateVariantScrollIndicators = () => {
+    const { container, content } = variantScrollMetrics.current;
+    setCanScrollVariantsLeft(variantScrollOffset.current > 10);
+    setCanScrollVariantsRight(
+      variantScrollOffset.current + container < content - 10
     );
-    return used.size;
+  };
+
+  const scrollVariantChips = (direction: 'left' | 'right') => {
+    const next =
+      direction === 'left'
+        ? Math.max(0, variantScrollOffset.current - 200)
+        : variantScrollOffset.current + 200;
+    variantScrollRef.current?.scrollTo({ x: next, animated: true });
+    variantScrollOffset.current = Math.max(0, next);
+    updateVariantScrollIndicators();
   };
 
   const selectedItem =
@@ -251,9 +353,13 @@ export default function MenuScreen() {
   const selectedVariant =
     selectedVariantId &&
     variants.find((v) => v.id === selectedVariantId) || null;
+  const currentRecipeVariantId = recipeVariantId ?? selectedVariantId ?? null;
 
   const totalMenus = items.length;
-  const totalVariants = variants.length;
+  const totalVariants = Object.values(variantCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
   const uniqueRecipeIngredients = new Set(
     recipes.map((r) => r.ingredient_id)
   ).size;
@@ -285,6 +391,7 @@ export default function MenuScreen() {
       setNewItemName('');
       setNewItemCategory('');
       setShowAddMenuForm(false);
+      setInfo('Menu baharu ditambah.');
       await loadData();
     } catch (e: any) {
       console.error(e);
@@ -335,7 +442,12 @@ export default function MenuScreen() {
         setRecipeVariantId(data.id as string);
       }
 
-      await loadData();
+      setInfo('Varian baharu ditambah.');
+      setVariantCounts((prev) => ({
+        ...prev,
+        [selectedItemId]: (prev[selectedItemId] ?? 0) + 1,
+      }));
+      await fetchVariantsForItem(selectedItemId, true);
     } catch (e: any) {
       console.error(e);
       setError(e.message ?? 'Ralat semasa menambah varian.');
@@ -376,7 +488,8 @@ export default function MenuScreen() {
       setRecipeQty('');
       setRecipeVariantId(null);
       setShowIngredientPicker(false);
-      await loadData();
+      await fetchVariantsForItem(selectedItemId, true);
+      setInfo('Resipi dikemas kini.');
     } catch (e: any) {
       console.error(e);
       setError(e.message ?? 'Ralat semasa menyimpan resipi.');
@@ -416,7 +529,8 @@ export default function MenuScreen() {
         setRecipeQty('');
       }
 
-      await loadData();
+      await fetchVariantsForItem(selectedItemId, true);
+      setInfo('Bahan dibuang daripada resipi.');
     } catch (e: any) {
       console.error(e);
       setError(e.message ?? 'Ralat semasa memadam bahan.');
@@ -427,7 +541,7 @@ export default function MenuScreen() {
     '1) Pilih menu · 2) Pilih / tambah varian · 3) Ubah resipi.';
   const headerAction = (
     <TouchableOpacity
-      onPress={() => setShowAddMenuForm((x) => !x)}
+      onPress={() => setShowAddMenuForm(true)}
       style={{
         width: 40,
         height: 40,
@@ -466,12 +580,13 @@ export default function MenuScreen() {
   }
 
   return (
-    <AdminScreen
-      title="Menu & Resipi"
-      subtitle={screenSubtitle}
-      actions={headerAction}
-      contentPaddingBottom={160}
-    >
+    <>
+      <AdminScreen
+        title="Menu & Resipi"
+        subtitle={screenSubtitle}
+        actions={headerAction}
+        contentPaddingBottom={200}
+      >
       {error && (
         <AdminCard
           style={{
@@ -480,6 +595,16 @@ export default function MenuScreen() {
           }}
         >
           <Text style={{ color: '#b91c1c', fontWeight: '600' }}>{error}</Text>
+        </AdminCard>
+      )}
+      {info && (
+        <AdminCard
+          style={{
+            backgroundColor: '#ecfdf3',
+            borderColor: '#bbf7d0',
+          }}
+        >
+          <Text style={{ color: '#15803d', fontWeight: '600' }}>{info}</Text>
         </AdminCard>
       )}
 
@@ -523,121 +648,59 @@ export default function MenuScreen() {
             </View>
           ))}
         </View>
-      </AdminCard>
-
-      {showAddMenuForm && (
-        <AdminCard>
-          <SectionHeading label="Tambah menu baru" />
-          <TextInput
-            placeholder="Nama menu"
-            value={newItemName}
-            onChangeText={setNewItemName}
+        <TouchableOpacity
+          onPress={() => setShowMenuDropdown(true)}
+          style={{
+            marginTop: 12,
+            paddingVertical: 12,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#e5e7eb',
+            alignItems: 'center',
+            backgroundColor: '#fff',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingHorizontal: 16,
+          }}
+        >
+          <View>
+            <Text style={{ fontWeight: '600' }}>
+              {selectedItem ? selectedItem.name : 'Pilih menu'}
+            </Text>
+            <Text style={{ color: '#6b7280', fontSize: 12 }}>
+              {selectedItem
+                ? `${selectedItem.category || 'Tanpa kategori'} · ${
+                    selectedItem.active ? 'Aktif' : 'Tidak aktif'
+                  }`
+                : 'Tiada menu lagi'}
+            </Text>
+          </View>
+          <MaterialIcons name="arrow-drop-down" size={26} color="#374151" />
+        </TouchableOpacity>
+        {selectedItem && (
+          <View
             style={{
-              borderWidth: 1,
-              borderColor: '#d1d5db',
-              borderRadius: 10,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              marginBottom: 8,
-              backgroundColor: '#fff',
-            }}
-          />
-          <TextInput
-            placeholder="Kategori (optional)"
-            value={newItemCategory}
-            onChangeText={setNewItemCategory}
-            style={{
-              borderWidth: 1,
-              borderColor: '#d1d5db',
-              borderRadius: 10,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              marginBottom: 12,
-              backgroundColor: '#fff',
-            }}
-          />
-          <TouchableOpacity
-            onPress={handleAddItem}
-            style={{
-              paddingVertical: 12,
+              marginTop: 12,
+              padding: 12,
               borderRadius: 12,
-              backgroundColor: '#111827',
-              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: '#eef2ff',
+              backgroundColor: '#f5f7ff',
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: '600' }}>Simpan menu</Text>
-          </TouchableOpacity>
-        </AdminCard>
-      )}
-
-      <AdminCard>
-        <SectionHeading label="Langkah 1 · Pilih menu" />
-        {items.length === 0 ? (
-          <Text style={{ color: '#6b7280' }}>
-            Tiada menu lagi. Tekan ikon + di atas untuk menambah.
-          </Text>
-        ) : (
-          items.map((item) => {
-            const active = item.id === selectedItemId;
-            const vCount = variantsByItem(item.id).length;
-            const ingCount = ingredientCountForItem(item.id);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => {
-                  setSelectedItemId(item.id);
-                  const vs = variantsByItem(item.id);
-                  if (vs.length > 0) {
-                    setSelectedVariantId(vs[0].id);
-                    setRecipeVariantId(null);
-                    setRecipeIngredientId('');
-                    setRecipeQty('');
-                  }
-                }}
-                style={{
-                  paddingVertical: 12,
-                  borderBottomWidth: 1,
-                  borderColor: '#f1f5f9',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: active ? '700' : '500',
-                        color: active ? '#0f172a' : '#475467',
-                      }}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>
-                      {item.category || 'Tanpa kategori'} ·{' '}
-                      {item.active ? 'Aktif' : 'Tidak aktif'}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>
-                      {vCount} varian
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#94a3b8' }}>
-                      {ingCount} bahan
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })
+            <Text style={{ fontWeight: '600', marginBottom: 4 }}>
+              {selectedItem.name}
+            </Text>
+            <Text style={{ color: '#6b7280', marginBottom: 4 }}>
+              Varian: {variantCounts[selectedItem.id] ?? 0}
+            </Text>
+            <Text style={{ color: '#6b7280' }}>
+              Status: {selectedItem.active ? 'Aktif' : 'Tidak aktif'}
+            </Text>
+          </View>
         )}
       </AdminCard>
-
-      {selectedItem && (
+      {selectedItem ? (
         <AdminCard>
           <SectionHeading label="Langkah 2 & 3 · Varian & Resipi" />
           <Text style={{ fontWeight: '700', marginBottom: 2 }}>{selectedItem.name}</Text>
@@ -646,57 +709,151 @@ export default function MenuScreen() {
             {selectedItem.active ? 'Aktif' : 'Tidak aktif'}
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ marginBottom: 10 }}
-          >
-            {variantsByItem(selectedItem.id).map((v) => {
-              const active = v.id === selectedVariantId;
-              return (
-                <TouchableOpacity
-                  key={v.id}
-                  onPress={() => {
-                    setSelectedVariantId(v.id);
-                    setRecipeVariantId(null);
-                    setRecipeIngredientId('');
-                    setRecipeQty('');
-                  }}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                    backgroundColor: active ? '#111827' : '#e5e7eb',
-                    marginRight: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: active ? '#fff' : '#111827',
-                      fontWeight: active ? '600' : '500',
-                    }}
-                  >
-                    {v.name} · RM {v.price.toFixed(2)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          {variantLoading && variants.length === 0 && (
+            <View style={{ alignItems: 'center', marginVertical: 12 }}>
+              <ActivityIndicator />
+            </View>
+          )}
 
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 10,
+              gap: 8,
+            }}
+          >
             <TouchableOpacity
-              onPress={() => setShowVariantForm((x) => !x)}
+              onPress={() => scrollVariantChips('left')}
+              disabled={!canScrollVariantsLeft}
               style={{
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                borderRadius: 999,
-                backgroundColor: '#f97316',
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: canScrollVariantsLeft ? '#c7d2fe' : '#e5e7eb',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: canScrollVariantsLeft ? '#eef2ff' : '#fff',
               }}
             >
-              <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>
-                + Varian
-              </Text>
+              <MaterialIcons
+                name="chevron-left"
+                size={20}
+                color={canScrollVariantsLeft ? '#312e81' : '#cbd5f5'}
+              />
             </TouchableOpacity>
-          </ScrollView>
+            <ScrollView
+              horizontal
+              ref={variantScrollRef}
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: 4 }}
+              onLayout={(event) => {
+                variantScrollMetrics.current.container = event.nativeEvent.layout.width;
+                updateVariantScrollIndicators();
+              }}
+              onContentSizeChange={(width) => {
+                variantScrollMetrics.current.content = width;
+                updateVariantScrollIndicators();
+              }}
+              onScroll={(event) => {
+                const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+                variantScrollOffset.current = contentOffset.x;
+                setCanScrollVariantsLeft(contentOffset.x > 10);
+                setCanScrollVariantsRight(
+                  contentOffset.x + layoutMeasurement.width < contentSize.width - 10
+                );
+                variantScrollMetrics.current = {
+                  container: layoutMeasurement.width,
+                  content: contentSize.width,
+                };
+              }}
+              scrollEventThrottle={16}
+            >
+              {variants.map((v) => {
+                const active = v.id === selectedVariantId;
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    onPress={() => {
+                      setSelectedVariantId(v.id);
+                      setRecipeVariantId(null);
+                      setRecipeIngredientId('');
+                      setRecipeQty('');
+                    }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      backgroundColor: active ? '#111827' : '#e5e7eb',
+                      marginRight: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: active ? '#fff' : '#111827',
+                        fontWeight: active ? '600' : '500',
+                      }}
+                    >
+                      {v.name} · RM {v.price.toFixed(2)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <TouchableOpacity
+                onPress={() => setShowVariantForm((x) => !x)}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  backgroundColor: '#f97316',
+                }}
+              >
+                <Text style={{ fontSize: 12, color: '#fff', fontWeight: '600' }}>
+                  + Varian
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+            <TouchableOpacity
+              onPress={() => scrollVariantChips('right')}
+              disabled={!canScrollVariantsRight}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: canScrollVariantsRight ? '#c7d2fe' : '#e5e7eb',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: canScrollVariantsRight ? '#eef2ff' : '#fff',
+              }}
+            >
+              <MaterialIcons
+                name="chevron-right"
+                size={20}
+                color={canScrollVariantsRight ? '#312e81' : '#cbd5f5'}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {selectedVariant && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 12,
+              }}
+            >
+              <MaterialIcons name="tune" size={16} color="#4c1d95" />
+              <Text style={{ color: '#4c1d95', fontWeight: '600' }}>
+                Menyunting: {selectedVariant.name}
+              </Text>
+            </View>
+          )}
 
           {showVariantForm && (
             <View
@@ -869,7 +1026,13 @@ export default function MenuScreen() {
                 </Text>
 
                 <TouchableOpacity
-                  onPress={() => setShowIngredientPicker((x) => !x)}
+                  onPress={() => {
+                    setIngredientSearch('');
+                    if (selectedVariantId) {
+                      setRecipeVariantId(selectedVariantId);
+                    }
+                    setShowIngredientPicker(true);
+                  }}
                   style={{
                     borderWidth: 1,
                     borderColor: '#e2e8f0',
@@ -893,41 +1056,6 @@ export default function MenuScreen() {
                       : 'Pilih bahan'}
                   </Text>
                 </TouchableOpacity>
-
-                {showIngredientPicker && (
-                  <View
-                    style={{
-                      maxHeight: 150,
-                      borderWidth: 1,
-                      borderColor: '#e2e8f0',
-                      borderRadius: 10,
-                      marginBottom: 6,
-                      backgroundColor: '#fff',
-                    }}
-                  >
-                    <ScrollView>
-                      {ingredients.map((ing) => (
-                        <TouchableOpacity
-                          key={ing.id}
-                          onPress={() => {
-                            setRecipeIngredientId(ing.id);
-                            setShowIngredientPicker(false);
-                          }}
-                          style={{
-                            paddingHorizontal: 10,
-                            paddingVertical: 6,
-                            borderBottomWidth: 1,
-                            borderColor: '#f1f5f9',
-                          }}
-                        >
-                          <Text style={{ fontSize: 12 }}>
-                            {ing.name} ({ing.unit})
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
 
                 <View style={{ marginBottom: 8 }}>
                   <Text style={{ fontSize: 11, color: '#6b7280' }}>
@@ -990,6 +1118,13 @@ export default function MenuScreen() {
             </>
           )}
         </AdminCard>
+      ) : (
+        <AdminCard>
+          <SectionHeading label="Langkah 2 & 3" />
+          <Text style={{ color: '#6b7280' }}>
+            Pilih menu dahulu untuk melihat varian dan resipi.
+          </Text>
+        </AdminCard>
       )}
 
       {loading && (
@@ -998,6 +1133,259 @@ export default function MenuScreen() {
         </AdminCard>
       )}
     </AdminScreen>
+
+    <Modal
+      visible={showAddMenuForm}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowAddMenuForm(false)}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 20,
+            gap: 12,
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '700' }}>Tambah menu baru</Text>
+          <TextInput
+            placeholder="Nama menu"
+            value={newItemName}
+            onChangeText={setNewItemName}
+            style={{
+              borderWidth: 1,
+              borderColor: '#d1d5db',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: '#fff',
+            }}
+          />
+          <TextInput
+            placeholder="Kategori (optional)"
+            value={newItemCategory}
+            onChangeText={setNewItemCategory}
+            style={{
+              borderWidth: 1,
+              borderColor: '#d1d5db',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: '#fff',
+            }}
+          />
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              onPress={() => setShowAddMenuForm(false)}
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: '#e5e7eb',
+                alignItems: 'center',
+              }}
+            >
+              <Text>Batal</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleAddItem}
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                borderRadius: 10,
+                backgroundColor: '#111827',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Simpan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    <Modal
+      visible={showIngredientPicker}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowIngredientPicker(false)}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 20,
+            maxHeight: '70%',
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+            Pilih bahan
+          </Text>
+          <TextInput
+            placeholder="Cari bahan…"
+            value={ingredientSearch}
+            onChangeText={setIngredientSearch}
+            style={{
+              borderWidth: 1,
+              borderColor: '#e5e7eb',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              marginBottom: 12,
+            }}
+          />
+          <ScrollView>
+            {ingredients
+              .filter((ing) =>
+                ing.name.toLowerCase().includes(ingredientSearch.toLowerCase())
+              )
+              .map((ing) => (
+                <TouchableOpacity
+                  key={ing.id}
+                  onPress={() => {
+                    setRecipeIngredientId(ing.id);
+                    const variantId = recipeVariantId ?? selectedVariantId ?? null;
+                    const existing = variantId
+                      ? recipes.find(
+                          (r) =>
+                            r.variant_id === variantId && r.ingredient_id === ing.id
+                        )
+                      : null;
+                    if (!recipeVariantId && variantId) {
+                      setRecipeVariantId(variantId);
+                    }
+                    setRecipeQty(
+                      existing ? String(existing.qty_per_serving) : ''
+                    );
+                    setShowIngredientPicker(false);
+                  }}
+                style={{
+                  paddingVertical: 10,
+                  borderBottomWidth: 1,
+                  borderColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>
+                  {ing.name} ({ing.unit})
+                </Text>
+              </TouchableOpacity>
+              ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => setShowIngredientPicker(false)}
+            style={{
+              marginTop: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
+              backgroundColor: '#e5e7eb',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontWeight: '600', color: '#111827' }}>Tutup</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    <Modal
+      visible={showMenuDropdown}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowMenuDropdown(false)}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 20,
+            maxHeight: '70%',
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+            Pilih menu
+          </Text>
+          <TextInput
+            placeholder="Cari menu…"
+            value={menuSearch}
+            onChangeText={setMenuSearch}
+            style={{
+              borderWidth: 1,
+              borderColor: '#e5e7eb',
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              marginBottom: 12,
+            }}
+          />
+          <ScrollView>
+            {menuOptions.length === 0 && (
+              <Text style={{ color: '#6b7280', textAlign: 'center', marginVertical: 16 }}>
+                Tiada menu ditemui.
+              </Text>
+            )}
+            {menuOptions.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => {
+                  setSelectedItemId(item.id);
+                  setMenuSearch('');
+                  setShowMenuDropdown(false);
+                }}
+                style={{
+                  paddingVertical: 12,
+                  borderBottomWidth: 1,
+                  borderColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ fontWeight: '600' }}>{item.name}</Text>
+                <Text style={{ color: '#6b7280', fontSize: 12 }}>
+                  {item.category || 'Tanpa kategori'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => {
+              setShowMenuDropdown(false);
+              setMenuSearch('');
+            }}
+            style={{
+              marginTop: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
+              backgroundColor: '#e5e7eb',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontWeight: '600', color: '#111827' }}>Tutup</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
-
