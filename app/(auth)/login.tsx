@@ -1,7 +1,19 @@
-﻿import React, { useState } from 'react';
-import { Alert, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ScrollView,
+  Image,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import BazarioLogo from '../../assets/images/BazarioLogo.png';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -48,41 +60,64 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to continue to Bazario</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.card}>
+          <Image source={BazarioLogo} style={styles.logo} resizeMode="contain" />
+          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.subtitle}>Sign in to continue to Bazario</Text>
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholder="you@example.com"
-          style={styles.input}
-        />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Email</Text>
+            <View style={styles.inputShell}>
+              <Ionicons name="mail-outline" color="#94a3b8" size={18} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholder="you@example.com"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+              />
+            </View>
+          </View>
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="********"
-          style={styles.input}
-        />
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.inputShell}>
+              <Ionicons name="lock-closed-outline" color="#94a3b8" size={18} />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="********"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+              />
+            </View>
+          </View>
 
-        <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.registerButton, registering && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={registering}
-        >
-          <Text style={styles.buttonText}>{registering ? 'Registering...' : 'Create Account'}</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.button, styles.registerButton, registering && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={registering}
+          >
+            <Text style={styles.buttonText}>{registering ? 'Registering...' : 'Create Account'}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -91,48 +126,77 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f3f4f6',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 28,
+    padding: 28,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
     elevation: 4,
+  },
+  logo: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111827',
+    color: '#0f172a',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
+    color: '#475569',
+    marginTop: 6,
     marginBottom: 24,
+    textAlign: 'center',
+  },
+  fieldGroup: {
+    marginBottom: 18,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#0f172a',
     marginBottom: 6,
   },
-  input: {
+  inputShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    padding: 12,
+    borderColor: '#cbd5f5',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'white',
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
     fontSize: 16,
-    marginBottom: 16,
+    color: '#0f172a',
   },
   button: {
     backgroundColor: '#2563eb',
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 14,
     alignItems: 'center',
+    marginTop: 4,
+    shadowColor: '#1d4ed8',
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.7,
