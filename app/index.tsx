@@ -48,7 +48,7 @@ export default function HomeScreen() {
         
         <TouchableOpacity 
           style={[styles.adminButton]}
-          onPress={() => router.push('/admin/analytics')}
+          onPress={() => router.push('/admin')}
         >
           <Text style={styles.buttonText}>Database Admin</Text>
           <Text style={styles.buttonSubtitle}>For system management</Text>

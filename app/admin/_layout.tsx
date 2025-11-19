@@ -1,16 +1,16 @@
-import { Tabs, useRouter } from 'expo-router'; 
 import { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { TouchableOpacity, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Avatar } from '../../components/ui/Avatar';
 import { Logo } from '../../components/ui/Logo';
 
 export default function AdminLayout() {
-  
   const router = useRouter();
+
   useEffect(() => {
-    router.replace('/admin/analytics');
-  }, [router]); // 
+    router.replace('/admin/sales');
+  }, [router]);
 
   return (
     <Tabs
@@ -48,11 +48,11 @@ export default function AdminLayout() {
         headerTitleAlign: 'center',
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
-      <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
+      <Tabs.Screen name="sales" options={{ title: 'Sales' }} />
       <Tabs.Screen name="inventory" options={{ title: 'Inventory' }} />
       <Tabs.Screen name="menu" options={{ title: 'Menu' }} />
-      <Tabs.Screen name="sales" options={{ title: 'Sales' }} />
+      <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
+      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
     </Tabs>
   );
 }
